@@ -27,6 +27,9 @@ class Inferencer:
                                                     device_map="auto",
                                                     trust_remote_code=True)
         self.model.eval()
+
+
+
         self.task_type = task_type
         self.inference_type = inference_type
 
@@ -39,6 +42,7 @@ class Inferencer:
         """
         生成提问 prompt.
         """
+
         with open('/data/lhb/test-openicl-0.1.8/openicl/ehrBase_result/cone_ice_idx.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
 
@@ -108,8 +112,8 @@ class Inferencer:
                 candidate_ans_logits = next_token_logits[0, candidate_ans_ids]  # 读取 A, B 的 logits
                 candidate_ans_logits_list.append(float(candidate_ans_logits))
             
-            # prediction = F.softmax(torch.tensor(candidate_ans_logits_list), dim=0).tolist()  # 归一化 logits 为概率
-            prediction = [x/sum(candidate_ans_logits_list) for x in candidate_ans_logits_list]
+            prediction = F.softmax(torch.tensor(candidate_ans_logits_list), dim=0).tolist()  # 归一化 logits 为概率
+            #prediction = [x/sum(candidate_ans_logits_list) for x in candidate_ans_logits_list]
 
 
             answers.append({
@@ -155,5 +159,5 @@ class Inferencer:
 
 if __name__ == '__main__':
     exm = Inferencer()
-    # exm.generete_deepseek_r1_prompt()
+    exm.generete_deepseek_r1_prompt()
     exm.inference()
