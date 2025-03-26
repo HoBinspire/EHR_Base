@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import re
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,6,7'
 
 
 
@@ -43,7 +43,7 @@ class Inferencer:
         生成提问 prompt.
         """
 
-        with open('/data/lhb/test-openicl-0.1.8/openicl/ehrBase_result/cone_ice_idx.json', 'r', encoding='utf-8') as file:
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/topk/qwen7B_embed/top3_qwenEmbed_ice_idx.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
@@ -59,18 +59,18 @@ class Inferencer:
                 'id': p_id,
                 'prompt': prompt
             })
-            with open('cone_prompt_deepseek_r1.json', 'w', encoding='utf-8') as file:
+            with open('top3_prompt_deepseek_r1.json', 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
 
     def generete_deepseek_r1_prompt(self):
-        with open('/data/lhb/test-openicl-0.1.8/openicl/ehrBase_result/topk/topk_prompt_deepseek_r1.json', 'r', encoding='utf-8') as file:
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/top3_prompt_deepseek_r1.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
         for item in tqdm(data):
             id = item['id']
 
-            if int(id) < 101:
+            if id < 10:  # ---------------------继续跑
                 continue
 
             input, response = self.get_response(item['prompt'])
@@ -87,8 +87,11 @@ class Inferencer:
                 'id': id,
                 'prompt': input + response
             })
-            with open('topk_prompt_deepseek_r1_with_response.json', 'w', encoding='utf-8') as file:
+            with open('top3_prompt_deepseek_r1_with_response.json', 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
+
+            del input, response,
+            torch.cuda.empty_cache()
 
             
     def inference(self):
@@ -119,7 +122,7 @@ class Inferencer:
             answers.append({
                 'id': item['id'],
                 'logits': candidate_ans_logits_list,
-                'prediction': prediction,
+                'prediction_softmax': prediction,
                 'label': self.dataloader.test_ds[item['id']]['label']
             })
             with open('/data/lhb/test-openicl-0.1.8/openicl/topk_res_deepseek_r1.json', 'w', encoding='utf-8') as file:
