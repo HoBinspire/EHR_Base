@@ -50,7 +50,7 @@ class DatasetReader:
         if 'Qwen' in embedding_model_path:  # Qwen 对 train_ds 编码
             pass     
         else:
-            self.train_index = faiss.read_index('/data/lhb/huggingface/faiss_index/mimic3_train_faiss_idx.index')
+            self.train_index = faiss.read_index('/data/lhb/test-openicl-0.1.8/EHR_Base/utils/faiss_index_qwen7B_train.index')
 
         # 测试集的 检索向量
         # self.__embedding(embedding_model_path)

@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import re
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,6,7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,7,6'
 
 
 
@@ -23,7 +23,7 @@ class Inferencer:
         self.tokenizer = AutoTokenizer.from_pretrained(model_path,
                                                     use_fast=False,
                                                     trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained( model_path,
+        self.model = AutoModelForCausalLM.from_pretrained(model_path,
                                                     device_map="auto",
                                                     trust_remote_code=True)
         self.model.eval()
@@ -31,10 +31,10 @@ class Inferencer:
 
 
         self.task_type = task_type
-        self.inference_type = inference_type
+        # self.inference_type = inference_type
 
         self.prompt_template = PromptTemplate()
-        self.prompt_template.inference_type = 'deep_seek_r1'
+        self.prompt_template.inference_type =  'straight_forward' # 'deep_seek_r1'
         self.dataloader = DatasetReader()
         pass
 
@@ -43,7 +43,7 @@ class Inferencer:
         生成提问 prompt.
         """
 
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/topk/qwen7B_embed/top3_qwenEmbed_ice_idx.json', 'r', encoding='utf-8') as file:
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/random/random3_ice_idx.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
@@ -59,19 +59,19 @@ class Inferencer:
                 'id': p_id,
                 'prompt': prompt
             })
-            with open('top3_prompt_deepseek_r1.json', 'w', encoding='utf-8') as file:
+            with open('random3_prompt_direct.json', 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
 
     def generete_deepseek_r1_prompt(self):
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/top3_prompt_deepseek_r1.json', 'r', encoding='utf-8') as file:
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/random/random3_prompt_deepseek_r1.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
         for item in tqdm(data):
             id = item['id']
 
-            if id < 10:  # ---------------------继续跑
-                continue
+            # if id < 80:  # ---------------------继续跑---------------------------
+            #     continue
 
             input, response = self.get_response(item['prompt'])
 
@@ -87,7 +87,7 @@ class Inferencer:
                 'id': id,
                 'prompt': input + response
             })
-            with open('top3_prompt_deepseek_r1_with_response.json', 'w', encoding='utf-8') as file:
+            with open('random3_prompt_deepseek_r1_with_response.json', 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
 
             del input, response,
@@ -98,11 +98,11 @@ class Inferencer:
         """
         用读取 prompt，进行单个 token 预测
         """
-        with open('/data/lhb/test-openicl-0.1.8/openicl/topk_prompt_deepseek_r1_with_response.json', 'r', encoding='utf-8') as file:
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/topk/bge_embed/topk_prompt_direct.json', 'r', encoding='utf-8') as file:
             data = json.load(file)
         
         answers = []
-        for item in tqdm(data):
+        for _, item in tqdm(enumerate(data)):
             input_ids = self.tokenizer(item['prompt'], return_tensors='pt')['input_ids']
             with torch.no_grad():
                 logits = self.model(input_ids).logits
@@ -125,7 +125,7 @@ class Inferencer:
                 'prediction_softmax': prediction,
                 'label': self.dataloader.test_ds[item['id']]['label']
             })
-            with open('/data/lhb/test-openicl-0.1.8/openicl/topk_res_deepseek_r1.json', 'w', encoding='utf-8') as file:
+            with open('topk_res_direct.json', 'w', encoding='utf-8') as file:
                 json.dump(answers, file, ensure_ascii=False, indent=4)
 
             del input_ids, logits, next_token_logits
@@ -156,6 +156,9 @@ class Inferencer:
         generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, generated_ids)]
         response_in_chat_template = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=False)[0]
         
+        del generated_ids, input_ids, inputs, text
+        torch.cuda.empty_cache()
+
         return response, response_in_chat_template
 
         

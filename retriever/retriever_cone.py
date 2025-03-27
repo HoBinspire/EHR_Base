@@ -14,14 +14,13 @@ import pickle
 from tqdm import tqdm
 
 from datareader import DatasetReader
-from retriever_topk import TopkRetriever
+from retriever.retriever_topk import TopkRetriever
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import os
 import json
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5,6'
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,7,6'
 
 
 class ConeRetriever(TopkRetriever):
@@ -47,7 +46,10 @@ class ConeRetriever(TopkRetriever):
 
     def cone_retrive(self, candidate_ice_num = 10, ice_num = 3):
         """Topk+Cone 检索结果"""
-        self.candidate_ice_idx_list = self.topk_retrive(ice_num=candidate_ice_num)  # 获取 topk 候选检索结果
+        # self.candidate_ice_idx_list = self.topk_retrive(ice_num=candidate_ice_num)  # 获取 topk 候选检索结果
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/cone/qwen7B_embed/cone10_qwenEmbed_ice_idx.json', 'r', encoding='utf-8') as file:
+            self.candidate_ice_idx_list = json.load(file)
+        # ---------------------------读取 本地文件方式--------------------------------------------------------------------
 
         task_head = "Here are a few examples, where <text> represents a description of the patient's health condition, and <label> represents whether the patient will die within 14 days.\n"
 
