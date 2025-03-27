@@ -31,6 +31,7 @@ class DatasetReader:
         dataset = load_dataset(dataset_path)  # Dict
         self.train_ds:Dataset = dataset['train']
         self.validation_ds = dataset['validation']
+        
         self.test_ds = dataset['test']
 
         if embed:

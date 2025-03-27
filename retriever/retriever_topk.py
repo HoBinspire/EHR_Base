@@ -29,7 +29,7 @@ class TopkRetriever:
         
         # 加载数据
         self.dataReader = DatasetReader(dataset_path, input_columns, output_column)  # 加载：训练集，测试集，验证集
-        # self.dataReader.embedding_dataset()  # 加载训练集的 faiss 向量索引， 测试集的 embedding 向量
+        self.dataReader.embedding_dataset()  # 加载训练集的 faiss 向量索引， 测试集的 embedding 向量
 
         # 储存结果
         self.res_idx_list = []
