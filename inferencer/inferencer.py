@@ -34,16 +34,16 @@ class Inferencer:
         # self.inference_type = inference_type
 
         self.prompt_template = PromptTemplate()
-        self.prompt_template.inference_type =  'straight_forward' # 'deep_seek_r1'
+        self.prompt_template.inference_type =  'deep_seek_r1' # 'deep_seek_r1'  # 'straight_forward'
         self.dataloader = DatasetReader()
         pass
 
-    def generate_direct_prompt(self):
+    def generate_direct_prompt(self, input_path, output_path):
         """
         生成提问 prompt.
         """
 
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/random/random3_ice_idx.json', 'r', encoding='utf-8') as file:
+        with open(input_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
@@ -51,7 +51,8 @@ class Inferencer:
             ice = ""
             prompt = ''
             for _, idx in enumerate(ice_idxs):
-                ice += f'Exmaple {_+1}:\n<Visit Sequence>' + self.dataloader.train_ds[idx]['text'] + '</Visit Sequence>\n<label>' + self.dataloader.train_ds[idx]['label'] + '</label>\n'
+                label = 'will readmit' if self.dataloader.train_ds[idx]['label'] == 1 else 'will not readmit'
+                ice += f'Exmaple {_+1}:\n<Visit Sequence>' + self.dataloader.train_ds[idx]['text'] + '</Visit Sequence>\n<label>' + label + '</label>\n'
             
             prompt = self.prompt_template.identity_head + self.prompt_template.data_description_head + 'Here are some examples for reference:\n' + ice + "current_patient_information:\n" + self.dataloader.test_ds[p_id]['text'] + '\n'+ self.prompt_template.task_head_generate() + self.prompt_template.inference_head_generate()
             
@@ -59,19 +60,16 @@ class Inferencer:
                 'id': p_id,
                 'prompt': prompt
             })
-            with open('random3_prompt_direct.json', 'w', encoding='utf-8') as file:
+            with open(output_path, 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
 
-    def generete_deepseek_r1_prompt(self):
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/random/random3_prompt_deepseek_r1.json', 'r', encoding='utf-8') as file:
+    def generete_deepseek_r1_prompt(self, input_path, output_path):
+        with open(input_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
         for item in tqdm(data):
             id = item['id']
-
-            # if id < 80:  # ---------------------继续跑---------------------------
-            #     continue
 
             input, response = self.get_response(item['prompt'])
 
@@ -87,18 +85,18 @@ class Inferencer:
                 'id': id,
                 'prompt': input + response
             })
-            with open('random3_prompt_deepseek_r1_with_response.json', 'w', encoding='utf-8') as file:
+            with open(output_path, 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
 
             del input, response,
             torch.cuda.empty_cache()
 
             
-    def inference(self):
+    def inference(self, input_path, output_path):
         """
         用读取 prompt，进行单个 token 预测
         """
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/topk/bge_embed/topk_prompt_direct.json', 'r', encoding='utf-8') as file:
+        with open(input_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
         
         answers = []
@@ -125,7 +123,7 @@ class Inferencer:
                 'prediction_softmax': prediction,
                 'label': self.dataloader.test_ds[item['id']]['label']
             })
-            with open('topk_res_direct.json', 'w', encoding='utf-8') as file:
+            with open(output_path, 'w', encoding='utf-8') as file:  # deeseek_r1  # direct
                 json.dump(answers, file, ensure_ascii=False, indent=4)
 
             del input_ids, logits, next_token_logits

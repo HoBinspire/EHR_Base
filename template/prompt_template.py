@@ -2,7 +2,7 @@ from typing import Dict, Optional, Union, Hashable
 
 
 class PromptTemplate:
-    def __init__(self, task_name='mortality_prediction', inference_type = 'straight_forward'):
+    def __init__(self, task_name='readmission_prediction', inference_type = 'straight_forward'):
         self.task_name = task_name
         self.inference_type = inference_type
 

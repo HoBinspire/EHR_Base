@@ -25,7 +25,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,7,6'
 
 class ConeRetriever(TopkRetriever):
     def __init__(self,
-                 dataset_path:str = '/data/lhb/huggingface/dataset/mimic3_1.4',
+                 dataset_path:str = '/data/lhb/huggingface/dataset/mimic3_1.4_readmission_prediction',
                  input_columns: Union[List[str], str] = ['text'],
                  output_column: str = 'label',
                  inferrence_model_path: str = '/data/lhb/huggingface/model/tokenizer/Qwen2.5-7B-instruct'
@@ -47,11 +47,11 @@ class ConeRetriever(TopkRetriever):
     def cone_retrive(self, candidate_ice_num = 10, ice_num = 3):
         """Topk+Cone 检索结果"""
         # self.candidate_ice_idx_list = self.topk_retrive(ice_num=candidate_ice_num)  # 获取 topk 候选检索结果
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/cone/qwen7B_embed/cone10_qwenEmbed_ice_idx.json', 'r', encoding='utf-8') as file:
+        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/readmission_prediction/randseed42/top10_cone3/bge_embed/top10_ice_idx.json', 'r', encoding='utf-8') as file:
             self.candidate_ice_idx_list = json.load(file)
         # ---------------------------读取 本地文件方式--------------------------------------------------------------------
 
-        task_head = "Here are a few examples, where <text> represents a description of the patient's health condition, and <label> represents whether the patient will die within 14 days.\n"
+        task_head = "Here are a few examples, where <text> represents a description of the patient's health condition, and <label> represents whether the patient will readmit within 14 days.\n"
 
         res_idx_list = []
         for p_idx, patient_ice_idx in tqdm(enumerate(self.candidate_ice_idx_list), desc=f"病人开始 cone 检索..."):  # 每个病人
@@ -62,7 +62,8 @@ class ConeRetriever(TopkRetriever):
             current_patient = '## test input:\n<text>\n' + self.dataReader.test_ds[p_idx]['text'] + '\n</text>'
             for _, idx in enumerate(patient_ice_idx):
                 # 拼接 prompt 计算 ice 掩码长度
-                prompt = task_head + f'## example:\n<text>\n' + self.dataReader.train_ds[idx]['text'] + '\n</text>\n<label>\n' + self.dataReader.train_ds[idx]['label'] + '\n</label>\n'
+                label = 'will readmit' if self.dataReader.train_ds[idx]['label'] == 1 else 'will not readmit'  # 针对 再入院预测
+                prompt = task_head + f'## example:\n<text>\n' + self.dataReader.train_ds[idx]['text'] + '\n</text>\n<label>\n' + label + '\n</label>\n'
                 mask_length = len(self.tokenizer(prompt, verbose=False)['input_ids'])
 
                 # 拼接 prompt，计算 ice+test input 掩码长度
@@ -104,7 +105,7 @@ class ConeRetriever(TopkRetriever):
 
 
             res_idx_list.append([self.candidate_ice_idx_list[p_idx][i] for i in indices.tolist()])  # 将当前病人的 检索结果返回
-            with open('cone_idx.json', "w") as file:
+            with open('cone3_idx.json', "w") as file:
                 json.dump(res_idx_list, file, indent=4)     
 
         return res_idx_list
