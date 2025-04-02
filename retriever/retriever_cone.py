@@ -15,20 +15,21 @@ from tqdm import tqdm
 
 from datareader import DatasetReader
 from retriever.retriever_topk import TopkRetriever
+import config
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import os
 import json
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,7,6'
+os.environ['CUDA_VISIBLE_DEVICES'] = config.CUDA_IDX
 
 
 class ConeRetriever(TopkRetriever):
     def __init__(self,
-                 dataset_path:str = '/data/lhb/huggingface/dataset/mimic3_1.4_readmission_prediction',
+                 dataset_path:str = config.DATASET_PATH,
                  input_columns: Union[List[str], str] = ['text'],
                  output_column: str = 'label',
-                 inferrence_model_path: str = '/data/lhb/huggingface/model/tokenizer/Qwen2.5-7B-instruct'
+                 inferrence_model_path: str = config.LLM_PATH
                  ) -> None:
         
         # 初始化父类对象
@@ -44,14 +45,14 @@ class ConeRetriever(TopkRetriever):
         self.tokenizer.padding_side = "right"
         
 
-    def cone_retrive(self, candidate_ice_num = 10, ice_num = 3):
+    def cone_retrive(self, candidate_idx_path, output_path, candidate_ice_num = config.CONDIDATE_NUM, ice_num = config.ICE_NUM):
         """Topk+Cone 检索结果"""
-        # self.candidate_ice_idx_list = self.topk_retrive(ice_num=candidate_ice_num)  # 获取 topk 候选检索结果
-        with open('/data/lhb/test-openicl-0.1.8/EHR_Base/results/readmission_prediction/randseed42/top10_cone3/bge_embed/top10_ice_idx.json', 'r', encoding='utf-8') as file:
+        # read local candidate idx
+        with open(candidate_idx_path, 'r', encoding='utf-8') as file:
             self.candidate_ice_idx_list = json.load(file)
-        # ---------------------------读取 本地文件方式--------------------------------------------------------------------
-
-        task_head = "Here are a few examples, where <text> represents a description of the patient's health condition, and <label> represents whether the patient will readmit within 14 days.\n"
+        
+        # 
+        data_desc = "Here are a few examples, where <text> represents a description of the patient's health condition, and <label> represents whether the patient will readmit within 14 days.\n"
 
         res_idx_list = []
         for p_idx, patient_ice_idx in tqdm(enumerate(self.candidate_ice_idx_list), desc=f"病人开始 cone 检索..."):  # 每个病人
@@ -63,7 +64,7 @@ class ConeRetriever(TopkRetriever):
             for _, idx in enumerate(patient_ice_idx):
                 # 拼接 prompt 计算 ice 掩码长度
                 label = 'will readmit' if self.dataReader.train_ds[idx]['label'] == 1 else 'will not readmit'  # 针对 再入院预测
-                prompt = task_head + f'## example:\n<text>\n' + self.dataReader.train_ds[idx]['text'] + '\n</text>\n<label>\n' + label + '\n</label>\n'
+                prompt = data_desc + f'## example:\n<text>\n' + self.dataReader.train_ds[idx]['text'] + '\n</text>\n<label>\n' + label + '\n</label>\n'
                 mask_length = len(self.tokenizer(prompt, verbose=False)['input_ids'])
 
                 # 拼接 prompt，计算 ice+test input 掩码长度
@@ -100,19 +101,19 @@ class ConeRetriever(TopkRetriever):
                     del input_ids, logits, loss, mask  # 显示清除显存
                     torch.cuda.empty_cache()
 
-            ## 3. 将条件熵 进行排序, 获取 top3 序号
+            ## 3. 将条件熵 进行排序, 获取 top3 idx
             _, indices = torch.topk(torch.tensor([t.item() for t in logits_list]), k=ice_num, largest=False)
 
 
             res_idx_list.append([self.candidate_ice_idx_list[p_idx][i] for i in indices.tolist()])  # 将当前病人的 检索结果返回
-            with open('cone3_idx.json', "w") as file:
-                json.dump(res_idx_list, file, indent=4)     
+            with open(output_path, "w") as file:
+                json.dump(res_idx_list, file, indent=4)  # 需要实时保存，防止 显存崩溃
 
         return res_idx_list
 
 
-    def retrive(self):
-        return self.cone_retrive()
+    def retrive(self, candidate_idx_path, output_path):
+        return self.cone_retrive(candidate_idx_path, output_path)
 
 
 

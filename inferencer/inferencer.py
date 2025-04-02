@@ -1,25 +1,22 @@
 import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
-
-from template.prompt_template import PromptTemplate
-from datareader import DatasetReader
 import json
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 import re
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,3,7,6'
+from template.prompt_template import PromptTemplate
+from datareader import DatasetReader
+import config
 
-
+os.environ['CUDA_VISIBLE_DEVICES'] = config.CUDA_IDX
 
 class Inferencer:
     def __init__(self,
-                 model_path = '/data/lhb/huggingface/model/tokenizer/Qwen2.5-7B-instruct',
-                 task_type = 'mortality_prediction',
-                 inference_type = 'straight_forward'
+                 model_path = config.DATASET_PATH,
                  ):
-
+        # load model
         self.tokenizer = AutoTokenizer.from_pretrained(model_path,
                                                     use_fast=False,
                                                     trust_remote_code=True)
@@ -28,19 +25,15 @@ class Inferencer:
                                                     trust_remote_code=True)
         self.model.eval()
 
-
-
-        self.task_type = task_type
-        # self.inference_type = inference_type
-
+        # load dataset & prompt_template
         self.prompt_template = PromptTemplate()
-        self.prompt_template.inference_type =  'deep_seek_r1' # 'deep_seek_r1'  # 'straight_forward'
         self.dataloader = DatasetReader()
-        pass
 
     def generate_direct_prompt(self, input_path, output_path):
         """
         生成提问 prompt.
+        input_path: ice_idx.json 文件
+        output_path: 提问 prompt 文件生成
         """
 
         with open(input_path, 'r', encoding='utf-8') as file:
@@ -51,10 +44,19 @@ class Inferencer:
             ice = ""
             prompt = ''
             for _, idx in enumerate(ice_idxs):
-                label = 'will readmit' if self.dataloader.train_ds[idx]['label'] == 1 else 'will not readmit'
+                if config.TASK_TPYE == 'mortality_prediction':
+                    pass
+                elif config.TASK_TPYE == 'readmission_prediction':
+                    label = 'will readmit' if self.dataloader.train_ds[idx]['label'] == 1 else 'will not readmit'
+                
                 ice += f'Exmaple {_+1}:\n<Visit Sequence>' + self.dataloader.train_ds[idx]['text'] + '</Visit Sequence>\n<label>' + label + '</label>\n'
             
-            prompt = self.prompt_template.identity_head + self.prompt_template.data_description_head + 'Here are some examples for reference:\n' + ice + "current_patient_information:\n" + self.dataloader.test_ds[p_id]['text'] + '\n'+ self.prompt_template.task_head_generate() + self.prompt_template.inference_head_generate()
+            prompt = self.prompt_template.identity_head_generate() + \
+                    self.prompt_template.data_description_head_generate("MIMICIII") + \
+                    'Here are some examples for reference:\n' + ice + "current_patient_information:\n" + \
+                    self.dataloader.test_ds[p_id]['text'] + '\n'+ \
+                    self.prompt_template.task_head_generate(config.TASK_TPYE) + \
+                    self.prompt_template.inference_head_generate(config.INFERENCE_TYPE)
             
             prompt_list.append({
                 'id': p_id,
@@ -63,13 +65,16 @@ class Inferencer:
             with open(output_path, 'w', encoding='utf-8') as file:
                 json.dump(prompt_list, file, ensure_ascii=False, indent=4)
 
-    def generete_deepseek_r1_prompt(self, input_path, output_path):
+    def generete_deepseek_r1_prompt(self, input_path, output_path, pause = 0):
         with open(input_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
 
         prompt_list = []
         for item in tqdm(data):
             id = item['id']
+
+            if id < pause: # --------跳过
+                continue
 
             input, response = self.get_response(item['prompt'])
 
@@ -92,7 +97,7 @@ class Inferencer:
             torch.cuda.empty_cache()
 
             
-    def inference(self, input_path, output_path):
+    def inference(self, input_path, output_path, pause = 0):
         """
         用读取 prompt，进行单个 token 预测
         """
@@ -101,6 +106,9 @@ class Inferencer:
         
         answers = []
         for _, item in tqdm(enumerate(data)):
+            if _ < pause:  # 跳过-----------------
+                continue
+
             input_ids = self.tokenizer(item['prompt'], return_tensors='pt')['input_ids']
             with torch.no_grad():
                 logits = self.model(input_ids).logits
@@ -162,6 +170,4 @@ class Inferencer:
         
 
 if __name__ == '__main__':
-    exm = Inferencer()
-    exm.generete_deepseek_r1_prompt()
-    exm.inference()
+    pass

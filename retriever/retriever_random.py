@@ -1,33 +1,44 @@
 import random
 import json
+from typing import List, Union, Optional, Dict
 
-random.seed(42)  # 设置 random 随机种子
-train_size = 47180  # 训练集大小
-
-def generate_random_lists(num_lists):
-    """
-    生成一个二维列表，每个元素是一个包含3个随机整数的一维列表。
-    随机整数范围是0到4000。
-
-    参数:
-        num_lists (int): 二维列表中一维列表的数量。
-
-    返回:
-        list: 生成的二维列表。
-    """
-    result = []
-    for _ in range(num_lists):
-        # 生成一个包含3个随机整数的一维列表
-        random_list = [random.randint(0, train_size-1) for _ in range(3)]
-        # 将一维列表添加到二维列表中
-        result.append(random_list)
-    return result
-
-# 示例用法
-num_lists = 200  # 假设我们想要生成5个一维列表
-random_2d_list = generate_random_lists(num_lists)
-print(random_2d_list)
+import config
+from datareader.datareader import DatasetReader
 
 
-with open('rand_idx.json', 'w', encoding='utf-8') as file:
-    json.dump(random_2d_list, file, ensure_ascii=False, indent=4)
+randSeed = config.RANDSEED
+
+class RandomRetriever:
+    def __init__(self,
+                 dataset_path:str = config.DATASET_PATH,
+                 input_columns: Union[List[str], str] = ['text'],
+                 output_column: str = 'label',
+                 ) -> None:
+        
+        # load data
+        self.dataReader = DatasetReader(dataset_path, input_columns, output_column)
+
+        # set config
+        self.train_ds_size = len(self.dataReader.train_ds)
+        random.seed(randSeed)
+
+    def retrive(self, test_num = config.TEST_NUM, ice_num = config.ICE_NUM):
+        """
+        生成一个二维列表, 每个元素是一个包含3个随机整数的一维列表。
+        存储 样例 index
+        """
+        results = []
+        for _ in range(test_num):
+            random_list = [random.randint(0, self.train_ds_size-1) for _ in range(ice_num)]
+            results.append(random_list)
+
+        with open(f'random{randSeed}_idx.json', 'w', encoding='utf-8') as file:
+            json.dump(results, file, ensure_ascii=False, indent=4)
+
+        return results
+
+
+if __name__ == '__main__':
+    x = RandomRetriever()
+
+    print(x.retrive())
